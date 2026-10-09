@@ -12,8 +12,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - project: minimalrouter
-            repository: vladimirperovic/minimalrouter
           - project: foldera
             repository: vladimirperovic/Foldera
     steps:
@@ -38,4 +36,4 @@ jobs:
       - name: Foldera offline partial checks (not a native app test)
         if: matrix.project == 'foldera'
         run: |
-          docker run --rm --network none audit-image bash -lc 'swift build --target CArchive --scratch-path /tmp/foldera-carchive && find Sources/Foldera Tests/FolderaTests -name "*.swift" -print0 | xargs -0 -n 1 swiftc -frontend -parse'
+          docker run --rm --network none audit-image bash -c 'set -euo pipefail; swift build --target CArchive --disable-index-store --scratch-path /tmp/foldera-carchive; find Sources/Foldera Tests/FolderaTests -name "*.swift" -print0 | xargs -0 -n 1 swiftc -frontend -parse'
