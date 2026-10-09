@@ -1,0 +1,41 @@
+name: Enrollment image validation
+on:
+  push:
+    branches: [codex/validate-enrollments]
+permissions:
+  contents: read
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: minimalrouter
+            repository: vladimirperovic/minimalrouter
+          - project: foldera
+            repository: vladimirperovic/Foldera
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ matrix.repository }}
+          path: source
+          persist-credentials: false
+      - name: Record audited commit
+        run: git -C source rev-parse HEAD
+      - name: Validate enrollment metadata
+        run: |
+          python3 -m pip install PyYAML
+          python3 tools/validate.py
+      - name: Build audit image
+        run: docker build -t audit-image -f projects/${{ matrix.project }}/Dockerfile source
+      - name: Minimal Router offline checks
+        if: matrix.project == 'minimalrouter'
+        run: |
+          docker run --rm --network none audit-image bash -lc 'export PATH=/usr/local/go/bin:$PATH GOPROXY=off GOSUMDB=off; go test -race ./... && go vet ./... && pnpm --dir web test && pnpm --dir web lint && pnpm --dir web test:e2e'
+      - name: Foldera offline partial checks (not a native app test)
+        if: matrix.project == 'foldera'
+        run: |
+          docker run --rm --network none audit-image bash -lc 'swift build --target CArchive --scratch-path /tmp/foldera-carchive && find Sources/Foldera Tests/FolderaTests -name "*.swift" -print0 | xargs -0 -n 1 swiftc -frontend -parse'
